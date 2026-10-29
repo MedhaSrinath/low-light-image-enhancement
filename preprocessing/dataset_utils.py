@@ -36,12 +36,17 @@ def get_image_pairs(split="Train"):
         if path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS
     }
 
-    common_names = sorted(input_files.keys() & gt_files.keys())
-
-    if not common_names:
+    input_only = sorted(input_files.keys() - gt_files.keys())
+    gt_only = sorted(gt_files.keys() - input_files.keys())
+    if input_only or gt_only:
         raise ValueError(
-            f"No matching image filenames found in the {split} folders."
+            f"Unmatched image filenames in {split}: "
+            f"missing GT for {input_only[:5]}, missing Input for {gt_only[:5]}"
         )
+
+    common_names = sorted(input_files.keys())
+    if not common_names:
+        raise ValueError(f"No images found in the {split} folders.")
 
     pairs = [
         (input_files[name], gt_files[name])
@@ -52,18 +57,16 @@ def get_image_pairs(split="Train"):
     print(f"  Input images: {len(input_files)}")
     print(f"  GT images: {len(gt_files)}")
     print(f"  Matching pairs: {len(pairs)}")
-    print(f"  Inputs without matching GT: {len(input_files.keys() - gt_files.keys())}")
-    print(f"  GT without matching input: {len(gt_files.keys() - input_files.keys())}")
-
     return pairs
 
 
-def load_image(image_path, size=(256, 256)):
-    """Load an image, convert it to RGB, resize it, and normalize pixels."""
+def load_image(image_path, size=None):
+    """Load an RGB image, optionally resize it, and normalize pixels."""
 
     with Image.open(image_path) as image:
         image = image.convert("RGB")
-        image = image.resize(size, Image.Resampling.BILINEAR)
+        if size is not None:
+            image = image.resize(size, Image.Resampling.BILINEAR)
         image_array = np.asarray(image, dtype=np.float32) / 255.0
 
     return image_array
@@ -78,8 +81,8 @@ def load_dataset(split="Train", size=(256, 256)):
     ground_truths = []
 
     for input_path, gt_path in pairs:
-        inputs.append(load_image(input_path, size))
-        ground_truths.append(load_image(gt_path, size))
+        inputs.append(load_image(input_path, size=size))
+        ground_truths.append(load_image(gt_path, size=size))
 
     return np.stack(inputs), np.stack(ground_truths)
 
