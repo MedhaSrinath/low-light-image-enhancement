@@ -21,14 +21,15 @@ def set_seed(seed):
         torch.cuda.manual_seed_all(seed)
 
 
-def run_epoch(model, loader, criterion, device, optimizer=None):
+def run_epoch(model, loader, criterion, device, optimizer=None, phase=""):
     training = optimizer is not None
     model.train(training)
     total_loss = 0.0
     total_images = 0
+    progress_interval = max(1, len(loader) // 5)
 
     with torch.enable_grad() if training else torch.no_grad():
-        for inputs, targets in loader:
+        for batch_index, (inputs, targets) in enumerate(loader, start=1):
             inputs = inputs.to(device)
             targets = targets.to(device)
 
@@ -44,6 +45,15 @@ def run_epoch(model, loader, criterion, device, optimizer=None):
 
             total_loss += loss.item() * inputs.size(0)
             total_images += inputs.size(0)
+
+            if phase and (
+                batch_index % progress_interval == 0
+                or batch_index == len(loader)
+            ):
+                print(
+                    f"  {phase}: batch {batch_index}/{len(loader)}",
+                    flush=True,
+                )
 
     if total_images == 0:
         raise ValueError("Cannot run an epoch with an empty data loader.")
@@ -69,11 +79,12 @@ def train_model(
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
     for epoch in range(1, epochs + 1):
+        print(f"Starting epoch {epoch}/{epochs}", flush=True)
         training_loss = run_epoch(
-            model, train_loader, criterion, device, optimizer
+            model, train_loader, criterion, device, optimizer, phase="Training"
         )
         validation_loss = run_epoch(
-            model, validation_loader, criterion, device
+            model, validation_loader, criterion, device, phase="Validation"
         )
         history.append(
             {
