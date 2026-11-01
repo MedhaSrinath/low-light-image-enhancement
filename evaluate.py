@@ -7,7 +7,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from model import EnhancementCNN
+from model import MODEL_VERSION, EnhancementCNN
 from preprocessing.dataset_utils import calculate_metrics
 from preprocessing.paired_dataset import PairedImageDataset
 
@@ -33,6 +33,11 @@ def load_checkpoint(model, checkpoint_path, device):
     )
     if "model_state_dict" not in checkpoint:
         raise ValueError(f"Checkpoint has no model weights: {checkpoint_path}")
+    if checkpoint.get("model_version") != MODEL_VERSION:
+        raise ValueError(
+            "Checkpoint is from an older model version. "
+            "Retrain the model with python train.py before evaluation."
+        )
 
     model.load_state_dict(checkpoint["model_state_dict"])
     return model

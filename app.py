@@ -7,7 +7,7 @@ import numpy as np
 import torch
 from PIL import Image, ImageOps
 
-from model import EnhancementCNN
+from model import MODEL_VERSION, EnhancementCNN
 
 
 st.set_page_config(
@@ -158,6 +158,12 @@ def load_model():
         weights_only=True
     )
 
+    if checkpoint.get("model_version") != MODEL_VERSION:
+        raise ValueError(
+            "This checkpoint is from an older model version. "
+            "Please retrain the model with python train.py."
+        )
+
     model.load_state_dict(checkpoint["model_state_dict"])
     model.eval()
 
@@ -168,9 +174,10 @@ def enhance_image(image, model, device):
     image = ImageOps.exif_transpose(image).convert("RGB")
     original_size = image.size
 
-    resized_image = image.resize(
+    resized_image = ImageOps.contain(
+        image,
         IMAGE_SIZE,
-        Image.Resampling.BILINEAR
+        method=Image.Resampling.BILINEAR,
     )
 
     image_array = np.asarray(
@@ -227,73 +234,63 @@ if uploaded_file is not None:
         original_image
     ).convert("RGB")
 
-    st.markdown(
-        '<div class="section-heading">Selected Image</div>',
-        unsafe_allow_html=True
+    enhancement_strength = st.slider(
+        "Enhancement strength",
+        min_value=0,
+        max_value=100,
+        value=100,
+        help="0% keeps the original image; 100% uses the model's full output.",
     )
 
-    st.image(
-        original_image,
-        use_container_width=True
-    )
+    try:
+        with st.spinner("Enhancing image..."):
+            model, device = load_model()
+            full_enhancement = enhance_image(original_image, model, device)
+            enhanced_image = Image.blend(
+                original_image,
+                full_enhancement,
+                enhancement_strength / 100,
+            )
 
-    if st.button("Enhance Image"):
+        st.markdown(
+            '<div class="section-heading">Before and After Comparison</div>',
+            unsafe_allow_html=True
+        )
 
-        try:
-            with st.spinner("Processing image..."):
+        col1, col2 = st.columns(2)
 
-                model, device = load_model()
-
-                enhanced_image = enhance_image(
-                    original_image,
-                    model,
-                    device
-                )
-
-            st.success("Image enhancement completed!")
-
+        with col1:
             st.markdown(
-                '<div class="section-heading">Before and After Comparison</div>',
+                '<div class="image-label">Original Image</div>',
                 unsafe_allow_html=True
             )
-
-            col1, col2 = st.columns(2)
-
-            with col1:
-                st.markdown(
-                    '<div class="image-label">Original Image</div>',
-                    unsafe_allow_html=True
-                )
-                st.image(
-                    original_image,
-                    use_container_width=True
-                )
-
-            with col2:
-                st.markdown(
-                    '<div class="image-label">Enhanced Image</div>',
-                    unsafe_allow_html=True
-                )
-                st.image(
-                    enhanced_image,
-                    use_container_width=True
-                )
-
-            image_buffer = io.BytesIO()
-            enhanced_image.save(image_buffer, format="PNG")
-
-            st.download_button(
-                "Download Enhanced Image",
-                data=image_buffer.getvalue(),
-                file_name="enhanced_image.png",
-                mime="image/png"
+            st.image(
+                original_image,
+                use_container_width=True
             )
 
-        except FileNotFoundError as error:
-            st.error(str(error))
+        with col2:
+            st.markdown(
+                '<div class="image-label">Enhanced Image</div>',
+                unsafe_allow_html=True
+            )
+            st.image(
+                enhanced_image,
+                use_container_width=True
+            )
 
-        except Exception as error:
-            st.error(f"Something went wrong: {error}")
+        image_buffer = io.BytesIO()
+        enhanced_image.save(image_buffer, format="PNG")
+
+        st.download_button(
+            "Download Enhanced Image",
+            data=image_buffer.getvalue(),
+            file_name="enhanced_image.png",
+            mime="image/png"
+        )
+
+    except (FileNotFoundError, ValueError) as error:
+        st.error(str(error))
 
 else:
     st.info("Upload an image to get started.")

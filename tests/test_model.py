@@ -10,6 +10,7 @@ def test_model_preserves_shape_and_outputs_rgb_values():
     enhanced = model(image)
 
     assert enhanced.shape == image.shape
+    assert torch.allclose(enhanced, image)
     assert torch.all((enhanced >= 0) & (enhanced <= 1))
 
 

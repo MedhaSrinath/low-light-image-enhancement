@@ -9,7 +9,7 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader
 
-from model import EnhancementCNN
+from model import MODEL_VERSION, EnhancementCNN
 from preprocessing.paired_dataset import create_train_validation_datasets
 
 
@@ -103,6 +103,7 @@ def train_model(
             best_validation_loss = validation_loss
             torch.save(
                 {
+                    "model_version": MODEL_VERSION,
                     "epoch": epoch,
                     "model_state_dict": model.state_dict(),
                     "validation_loss": validation_loss,

@@ -50,3 +50,15 @@ def test_missing_checkpoint_has_actionable_error(tmp_path):
             tmp_path / "missing.pt",
             torch.device("cpu"),
         )
+
+
+def test_old_checkpoint_requires_retraining(tmp_path):
+    checkpoint_path = tmp_path / "old.pt"
+    torch.save({"model_state_dict": EnhancementCNN().state_dict()}, checkpoint_path)
+
+    with pytest.raises(ValueError, match="older model version"):
+        load_checkpoint(
+            EnhancementCNN(),
+            checkpoint_path,
+            torch.device("cpu"),
+        )
