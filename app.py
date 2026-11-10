@@ -19,7 +19,6 @@ st.set_page_config(
 CHECKPOINT_PATH = Path("checkpoints/best_model.pt")
 IMAGE_SIZE = (384, 256)
 
-
 st.markdown("""
 <style>
 .stApp {
@@ -266,7 +265,7 @@ if uploaded_file is not None:
             )
             st.image(
                 original_image,
-                use_container_width=True
+                width="stretch"
             )
 
         with col2:
@@ -276,7 +275,7 @@ if uploaded_file is not None:
             )
             st.image(
                 enhanced_image,
-                use_container_width=True
+                width="stretch"
             )
 
         image_buffer = io.BytesIO()

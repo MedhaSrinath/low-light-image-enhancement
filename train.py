@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from torch import nn
+# SSIM metric from torchmetrics (used in combined loss)
+from torchmetrics.image import StructuralSimilarityIndexMeasure
 from torch.utils.data import DataLoader
 
 from model import MODEL_VERSION, EnhancementCNN
@@ -68,10 +70,25 @@ def train_model(
     epochs,
     learning_rate,
     device,
-    checkpoint_path,
-):
-    criterion = nn.L1Loss()
+    checkpoint_path):
+    # Import SSIM metric (torchmetrics moved it to the .image submodule)
+    from torchmetrics.image import StructuralSimilarityIndexMeasure
+    ssim = StructuralSimilarityIndexMeasure(data_range=1.0).to(device)
+
+    def combined_loss(pred, target):
+        l1 = nn.functional.l1_loss(pred, target)
+        ssim_val = ssim(pred, target)
+        # weight SSIM (higher is better) to penalize low similarity
+        return l1 + (1 - ssim_val) * 0.5
+
+    # Define loss (combined L1 + SSIM) and optimizer
+    criterion = combined_loss
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    # Cosine annealing learning‑rate scheduler (simple, no extra hyper‑params)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
+
+
+
     model.to(device)
     best_validation_loss = float("inf")
     history = []
@@ -79,6 +96,8 @@ def train_model(
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
     for epoch in range(1, epochs + 1):
+        # Update learning rate schedule at the end of each epoch
+        scheduler.step()
         print(f"Starting epoch {epoch}/{epochs}", flush=True)
         training_loss = run_epoch(
             model, train_loader, criterion, device, optimizer, phase="Training"
